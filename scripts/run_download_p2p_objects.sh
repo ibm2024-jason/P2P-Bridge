@@ -22,7 +22,12 @@ if ! python -c "import gdown" >/dev/null 2>&1; then
 fi
 
 echo "Downloading ScoreDenoise object data..."
-python -m gdown --folder "${GDRIVE_URL}" -O "${DOWNLOAD_ROOT}" --remaining-ok
+if python -m gdown --folder "${GDRIVE_URL}" -O "${DOWNLOAD_ROOT}" --remaining-ok; then
+  echo "Download finished."
+else
+  echo "Retrying without --remaining-ok for older gdown versions..."
+  python -m gdown --folder "${GDRIVE_URL}" -O "${DOWNLOAD_ROOT}"
+fi
 
 EXTRACT_ROOT="${DOWNLOAD_ROOT}/extracted"
 mkdir -p "${EXTRACT_ROOT}"
