@@ -25,7 +25,7 @@ directly on the server into `data/objects`:
 
 ```bash
 cd P2P-Bridge
-./scripts/download_scored_objects.sh data/objects
+./scripts/run_download_p2p_objects.sh data/objects
 ```
 
 Expected layout:
@@ -39,6 +39,11 @@ data/objects/
 
 If Google Drive blocks automated download, download the same ScoreDenoise files
 manually and extract them into `data/objects` with the layout above.
+
+The object dataset is GB-level after extraction. The public READMEs do not give
+an exact total size, so `run_download_p2p_objects.sh` prints the actual disk
+usage with `du -sh` after download and extraction. `gdown` shows per-file
+download progress bars while downloading.
 
 ## 3. Start Two Background Trainings On Two GPUs
 
