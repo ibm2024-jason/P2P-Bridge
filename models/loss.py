@@ -26,6 +26,19 @@ def l1(pred: Tensor, gt: Tensor) -> Tensor:
     return loss
 
 
+def rodr_x0(pred_x0: Tensor, clean: Tensor, noisy: Tensor, tangent_weight: float = 1.0, eps: float = 1e-8) -> Tensor:
+    """RODR loss on denoising displacement pred_x0 - noisy against clean - noisy."""
+    pred_dir = pred_x0 - noisy
+    gt_dir = clean - noisy
+    normal = gt_dir / (torch.sqrt(torch.sum(gt_dir**2, dim=1, keepdim=True)) + eps)
+    pred_normal = torch.sum(pred_dir * normal, dim=1, keepdim=True) * normal
+    pred_tangent = pred_dir - pred_normal
+    normal_loss = mse_loss(pred_normal, gt_dir, reduction="none")
+    tangent_loss = pred_tangent**2
+    loss = normal_loss + tangent_weight * tangent_loss
+    return reduce(loss, "b ... -> b", "mean")
+
+
 class EmdLoss:
     def __init__(self):
         self.emd = EMD.emdModule()
@@ -43,7 +56,7 @@ class EmdLoss:
         return loss
 
 
-def get_loss(type: Literal["mse", "mse_sum", "l1", "emd"]) -> callable:
+def get_loss(type: Literal["mse", "mse_sum", "l1", "emd", "rodr"]) -> callable:
     """
 
     Args:
@@ -60,3 +73,6 @@ def get_loss(type: Literal["mse", "mse_sum", "l1", "emd"]) -> callable:
         return l1
     if type == "emd":
         return EmdLoss()
+    if type == "rodr":
+        return rodr_x0
+    raise ValueError(f"Unknown loss type: {type}")

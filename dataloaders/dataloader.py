@@ -9,6 +9,7 @@ from torch.utils.data.distributed import DistributedSampler
 from .arkitscenes import ArkitNPZ
 from .punet import get_dataset
 from .scannetpp import NPZFolderTest, ScanNetPP
+from .starter_local import StarterLocalPatchDataset
 
 
 def save_iter(dataloader: DataLoader, sampler: Optional[DistributedSampler] = None) -> typing.Iterator:
@@ -102,6 +103,27 @@ def get_dataloader(
         test_dataset = get_dataset(
             dataset_root=opt.data.data_dir,
             split="test",
+        )
+    elif opt.data.dataset == "StarterLocal":
+        train_dataset = StarterLocalPatchDataset(
+            root=opt.data.data_dir,
+            split=opt.data.get("train_split", "train"),
+            patch_size=opt.data.npoints,
+            num_patches=opt.data.get("train_patches_per_cloud", 1000),
+            dense_size=opt.data.get("dense_size", 50000),
+            noise_min=opt.data.get("noise_min", 0.005),
+            noise_max=opt.data.get("noise_max", 0.020),
+            seed=opt.training.seed,
+        )
+        test_dataset = StarterLocalPatchDataset(
+            root=opt.data.data_dir,
+            split=opt.data.get("val_split", "validate"),
+            patch_size=opt.data.npoints,
+            num_patches=opt.data.get("val_patches_per_cloud", 8),
+            dense_size=opt.data.get("dense_size", 50000),
+            noise_min=opt.data.get("noise_min", 0.005),
+            noise_max=opt.data.get("noise_max", 0.020),
+            seed=opt.training.seed + 12345,
         )
     else:
         raise NotImplementedError(f"Dataset {opt.data.dataset} not implemented!")

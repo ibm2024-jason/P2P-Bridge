@@ -84,6 +84,8 @@ class P2PB(DiffusionModel):
         self.weight_loss = cfg.diffusion.weight_loss if "weight_loss" in cfg.diffusion else False
         self.symmetric = cfg.diffusion.symmetric if "symmetric" in cfg.diffusion else True
         self.loss_multiplier = cfg.diffusion.loss_multiplier if "loss_multiplier" in cfg.diffusion else 1.0
+        self.loss_type = cfg.diffusion.get("loss_type", "mse")
+        self.rodr_tangent_weight = cfg.diffusion.get("rodr_tangent_weight", 1.0)
         snr_clip = cfg.diffusion.snr_clip if "snr_clip" in cfg.diffusion else False
 
         # load model
@@ -128,7 +130,7 @@ class P2PB(DiffusionModel):
         self.std_sb = to_torch(std_sb).to(device)
         self.mu_x0 = to_torch(mu_x0).to(device)
         self.mu_x1 = to_torch(mu_x1).to(device)
-        self.calculate_loss = get_loss(cfg.diffusion.get("loss_type", "mse"))
+        self.calculate_loss = get_loss(self.loss_type)
 
         alphas_cumprod = np.cumprod(1 - betas)
         snr = alphas_cumprod / (1 - alphas_cumprod)
@@ -404,9 +406,18 @@ class P2PB(DiffusionModel):
 
         pred = self.model(xt, noise_levels, x_cond=x_cond)
 
-        loss = self.calculate_loss(pred, gt)
-        if self.weight_loss:
-            loss = loss * extract(self.loss_weight, steps, loss.shape)
+        if self.loss_type == "rodr":
+            if self.objective == "pred_noise":
+                pred_x0 = self.compute_pred_x0_from_eps(steps, xt, pred)
+            elif self.objective == "pred_x0":
+                pred_x0 = pred
+            else:
+                raise ValueError(f"RODR loss does not support objective={self.objective}")
+            loss = self.calculate_loss(pred_x0, x0, x1, tangent_weight=self.rodr_tangent_weight)
+        else:
+            loss = self.calculate_loss(pred, gt)
+            if self.weight_loss:
+                loss = loss * extract(self.loss_weight, steps, loss.shape)
         loss = loss.mean()
         loss = loss * self.loss_multiplier
 
