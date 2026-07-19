@@ -1,5 +1,5 @@
 data:
-  data_dir: /home/ibm2024/jittor/starter_code/starter_code
+  data_dir: data
   dataset: StarterLocal
   augment: false
   use_rgb_features: false

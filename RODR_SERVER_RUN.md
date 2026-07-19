@@ -53,7 +53,8 @@ Run baseline on GPU 0 and RODR on GPU 1 with P2P's PUNet data:
 STEPS=2000 BS=8 ./scripts/run_train_pair_bg.sh punet 0 1 experiments/rodr_compare_punet
 ```
 
-Run baseline on GPU 2 and RODR on GPU 3 with starter-code data:
+Run baseline on GPU 2 and RODR on GPU 3 with starter-code data under
+`P2P-Bridge/data`:
 
 ```bash
 STEPS=2000 BS=8 ./scripts/run_train_pair_bg.sh starter 2 3 experiments/rodr_compare_starter
@@ -88,8 +89,8 @@ STEP=2000 ./scripts/run_eval_pair.sh starter 0 experiments/rodr_compare_starter
 ## Notes
 
 - `punet` uses P2P's native dataloader and `evaluate_objects.py`.
-- `starter` trains from `starter_code/dataset_train` meshes and validates on
-  `starter_code/local/clean` plus `starter_code/local/noisy`.
+- `starter` trains from `data/dataset_train` meshes and validates on
+  `data/local/clean` plus `data/local/noisy`.
 - `run_train_pair_bg.sh <dataset> <baseline_gpu> <rodr_gpu> <save_root>` starts
   both trainings with `nohup`-style background jobs and writes PID/log files.
 - `run_eval_pair.sh <dataset> <gpu> <save_root>` evaluates both checkpoints.
