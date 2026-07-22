@@ -8,7 +8,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Render high-resolution 3D comparison images from existing .xyz predictions. "
-            "Colors show nearest-neighbor distance to the clean GT point cloud."
+            "Colors show point-to-surface distance to the clean GT mesh."
         )
     )
     parser.add_argument("--eval_root", default="experiments/rodr_compare_punet_full/manual_eval_objects")
@@ -55,6 +55,10 @@ def gt_path(dataset_root: Path, dataset: str, resolution: int, shape_name: str) 
     return dataset_root / dataset / "pointclouds" / "test" / f"{resolution}_poisson" / f"{shape_name}.xyz"
 
 
+def mesh_path(dataset_root: Path, dataset: str, shape_name: str) -> Path:
+    return dataset_root / dataset / "meshes" / "test" / f"{shape_name}.off"
+
+
 def noisy_path(dataset_root: Path, dataset: str, resolution: int, noise: float, shape_name: str) -> Path:
     setting = f"{dataset}_{resolution}_poisson_{noise_token(noise)}"
     return dataset_root / "examples" / setting / f"{shape_name}.xyz"
@@ -91,6 +95,9 @@ def available_shapes(
     gt_dir = dataset_root / dataset / "pointclouds" / "test" / f"{resolution}_poisson"
     if gt_dir.exists():
         shape_sets.append({path.stem for path in gt_dir.glob("*.xyz")})
+    mesh_dir = dataset_root / dataset / "meshes" / "test"
+    if mesh_dir.exists():
+        shape_sets.append({path.stem for path in mesh_dir.glob("*.off")})
 
     for model_name in models:
         setting = f"P2P-Bridge_steps_{diffusion_steps}_{resolution}_{noise_token(noise)}"
@@ -103,10 +110,30 @@ def available_shapes(
     return sorted(set.intersection(*shape_sets))
 
 
-def nn_distance_to_gt(points: np.ndarray, gt_points: np.ndarray) -> np.ndarray:
-    from scipy.spatial import cKDTree
+def load_mesh(path: Path) -> tuple[np.ndarray, np.ndarray]:
+    if not path.exists():
+        raise FileNotFoundError(path)
+    import point_cloud_utils as pcu
 
-    distances, _ = cKDTree(gt_points).query(points, k=1, workers=-1)
+    verts, faces = pcu.load_mesh_vf(path)
+    return verts.astype(np.float32), faces.astype(np.int64)
+
+
+def normalize_to_mesh_unit_sphere(points: np.ndarray, verts: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    mesh_max = verts.max(axis=0, keepdims=True)
+    mesh_min = verts.min(axis=0, keepdims=True)
+    center = (mesh_max + mesh_min) / 2
+    verts_centered = verts - center
+    scale = np.linalg.norm(verts_centered, axis=1).max()
+    scale = max(float(scale), 1e-8)
+    return (points - center) / scale, verts_centered / scale
+
+
+def point_surface_distance(points: np.ndarray, verts: np.ndarray, faces: np.ndarray) -> np.ndarray:
+    import point_cloud_utils as pcu
+
+    points_norm, verts_norm = normalize_to_mesh_unit_sphere(points, verts)
+    distances, _, _ = pcu.closest_points_on_mesh(points_norm, verts_norm, faces)
     return distances.astype(np.float32)
 
 
@@ -151,7 +178,7 @@ def render_one(
     all_values: list[np.ndarray] = []
 
     for row_idx, shape_name in enumerate(shape_names):
-        gt = load_xyz(gt_path(dataset_root, dataset, resolution, shape_name))
+        verts, faces = load_mesh(mesh_path(dataset_root, dataset, shape_name))
         for col_idx, column in enumerate(columns):
             path = (
                 noisy_path(dataset_root, dataset, resolution, noise, shape_name)
@@ -168,7 +195,7 @@ def render_one(
                 )
             )
             points = load_xyz(path)
-            values = nn_distance_to_gt(points, gt)
+            values = point_surface_distance(points, verts, faces)
             points, values = downsample(points, values, args.max_points, seed=row_idx * 1009 + col_idx)
             loaded[(shape_name, column)] = (points, values)
             all_values.append(values)
@@ -226,7 +253,7 @@ def render_one(
             pad=0.01,
             shrink=0.82,
         )
-        cbar.set_label("Nearest-neighbor distance to GT (darker=cleaner, brighter=noisier)", fontsize=10)
+        cbar.set_label("Point-to-surface distance to GT mesh (darker=cleaner, brighter=noisier)", fontsize=10)
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
