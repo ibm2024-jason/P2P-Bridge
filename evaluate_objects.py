@@ -15,6 +15,14 @@ from models.train_utils import set_seed
 from utils.utils import NormalizeUnitSphere, write_array_to_xyz
 
 
+def parse_cuda_index(device: str) -> int:
+    if device == "cuda":
+        return 0
+    if device.startswith("cuda:"):
+        return int(device.split(":", 1)[1])
+    raise ValueError(f"Expected CUDA device like 'cuda:0', got {device}")
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -44,7 +52,7 @@ def parse_args():
 
     # set some additional parameters
     cfg.restart = False
-    cfg.local_rank = 0
+    cfg.local_rank = parse_cuda_index(cfg.gpu)
     return cfg
 
 
@@ -145,6 +153,7 @@ def sample(
         save_title (str): The title to save the results. Default: "P2P-Bridge".
     """
     set_seed(cfg)
+    torch.cuda.set_device(cfg.local_rank)
     torch.cuda.manual_seed_all(cfg.training.seed)
     torch.backends.cudnn.benchmark = True
 
@@ -164,7 +173,7 @@ def sample(
 
             for data in input_iter(input_dir):
                 logger.info(f"Processing {data['name']}")
-                pcl_noisy = data["pcl_noisy"].cuda()
+                pcl_noisy = data["pcl_noisy"].to(cfg.gpu)
                 with torch.no_grad():
                     model.eval()
                     pcl_next = pcl_noisy
@@ -198,7 +207,7 @@ def sample(
                 dataset=cfg.dataset,
                 summary_dir=output_dir,
                 experiment_name=save_title,
-                device="cuda",
+                device=cfg.gpu,
                 res_gts=f"{res}_poisson",
             )
             evaluator.run()

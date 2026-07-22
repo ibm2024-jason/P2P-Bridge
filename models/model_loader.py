@@ -93,7 +93,7 @@ def load_diffusion(cfg: Dict) -> tuple:
 
     gpu = cfg.local_rank
 
-    model = model.cuda()
+    model = model.to(gpu)
 
     # setup DDP model
     if cfg.distribution_type == "multi":
