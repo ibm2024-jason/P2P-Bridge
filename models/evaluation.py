@@ -20,6 +20,10 @@ from models.train_utils import get_data_batch
 from utils.visualize import visualize_pointcloud_batch
 
 
+def mse_metric(pred: Tensor, gt: Tensor) -> float:
+    return torch.mean((pred - gt) ** 2).detach().cpu().item()
+
+
 def save_visualizations(items: List[Tuple[Tensor, str]], out_dir: str, step: int) -> None:
     """
     Save visualizations of the given items.
@@ -98,17 +102,18 @@ def evaluate(
     Returns:
         dict: Evaluation metrics.
     """
+    device = getattr(model, "device", torch.device("cuda"))
     if sampling:
         out_dir = cfg.out_sampling
     else:
         out_dir = cfg.outf_syn
 
     sample_data = {
-        "x_pred": torch.tensor([]).cuda(),
+        "x_pred": torch.tensor([], device=device),
         "x_chain": None,
-        "x_start": torch.tensor([]).cuda(),
-        "x_cond": torch.tensor([]).cuda(),
-        "x_gt": torch.tensor([]).cuda(),
+        "x_start": torch.tensor([], device=device),
+        "x_cond": torch.tensor([], device=device),
+        "x_gt": torch.tensor([], device=device),
     }
 
     accum_iter = cfg.sampling.accum_iter if "accum_iter" in cfg.sampling else 1
@@ -119,9 +124,9 @@ def evaluate(
         x_cond = data_batch["x_cond"]
         x_start = data_batch["x_start"]
 
-        x_gt = x_gt.cuda() if x_gt is not None else None
-        x_cond = x_cond.cuda() if x_cond is not None else None
-        x_start = x_start.cuda() if x_start is not None else None
+        x_gt = x_gt.to(device) if x_gt is not None else None
+        x_cond = x_cond.to(device) if x_cond is not None else None
+        x_start = x_start.to(device) if x_start is not None else None
 
         with torch.no_grad():
             model_out = model.sample(
@@ -233,7 +238,7 @@ def get_metrics(
 
     if fast:
         cd = np.mean(calculate_cd_cuda(pred, gt)) * 1000
-        eval_loss = np.mean(model.loss(pred, gt).cpu().numpy()) if model is not None else 0
+        eval_loss = mse_metric(pred, gt)
         emd = np.mean(calculate_emd_cuda(pred, gt)) * 1000
     else:
         # make sure that pred and gt are divisable by 128
@@ -247,7 +252,7 @@ def get_metrics(
         pred = pred.transpose(1, 2).contiguous()
 
         cd = np.mean(calculate_cd(pred, gt)) * 1000
-        eval_loss = np.mean(model.loss(pred, gt).detach().cpu().numpy()) if model is not None else 0
+        eval_loss = mse_metric(pred, gt)
         emd = np.mean(calculate_emd_exact_cuda(pred, gt)) * 1000
     return cd, emd, eval_loss
 
@@ -436,7 +441,7 @@ class Evaluator(object):
 
 def update_summary(path, model, metrics):
     if os.path.exists(path):
-        df = pd.read_csv(path, index_col=0, sep="\s*,\s*", engine="python")
+        df = pd.read_csv(path, index_col=0, sep=r"\s*,\s*", engine="python")
     else:
         df = pd.DataFrame()
     for metric, value in metrics.items():

@@ -10,6 +10,7 @@ BS="${BS:-8}"
 WORKERS="${WORKERS:-2}"
 WANDB_MODE="${WANDB_MODE:-disabled}"
 RODR_WEIGHT="${RODR_WEIGHT:-1.0}"
+RODR_NAME="${RODR_NAME:-rodr_w${RODR_WEIGHT}}"
 
 export CUDA_VISIBLE_DEVICES="${GPU}"
 export WANDB_MODE
@@ -44,7 +45,7 @@ echo "Running RODR from ${RODR_CONFIG}"
 python train.py \
   --config "${RODR_CONFIG}" \
   --save_dir "${SAVE_ROOT}" \
-  --name rodr_w${RODR_WEIGHT}" \
+  --name "${RODR_NAME}" \
   --distribution_type single \
   --training.steps "${STEPS}" \
   --training.bs "${BS}" \

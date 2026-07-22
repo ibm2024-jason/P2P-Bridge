@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SAVE_ROOT="${1:-experiments/rodr_compare_starter}"
-RODR_WEIGHT="${RODR_WEIGHT:-1.0}"
-RODR_NAME="${RODR_NAME:-rodr_w${RODR_WEIGHT}}"
+SAVE_ROOT="${1:-experiments/rodr_compare_punet_full}"
+WEIGHTS=(${WEIGHTS:-0.25 0.5 0.8 1.2})
 
-for name in baseline_mse "${RODR_NAME}"; do
+for weight in "${WEIGHTS[@]}"; do
+  name="rodr_w${weight}"
   pid_file="${SAVE_ROOT}/${name}.pid"
   log_file="${SAVE_ROOT}/logs/${name}.log"
+
   if [ -f "${pid_file}" ]; then
     pid="$(cat "${pid_file}")"
     if kill -0 "${pid}" >/dev/null 2>&1; then
@@ -18,6 +19,7 @@ for name in baseline_mse "${RODR_NAME}"; do
   else
     echo "${name}: no pid file"
   fi
+
   if [ -f "${log_file}" ]; then
     echo "--- tail ${log_file} ---"
     tail -n 8 "${log_file}"

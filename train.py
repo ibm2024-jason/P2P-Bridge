@@ -191,12 +191,9 @@ def train(cfg: DictConfig) -> None:
             model.eval()
             if is_main_process:
                 try:
-                    evaluate(model, val_loader, cfg, step + 1)
+                    evaluate(model, val_loader, cfg, step + 1, fast=cfg.get("fast_eval", True))
                 except Exception as e:
-                    # print traceback and continue
-                    print(sys.exc_info())
-                    logger.warning("Could not evaluate model. Skipping.")
-                    logger.warning(e)
+                    logger.exception("Could not evaluate model. Skipping this validation step.")
 
             torch.cuda.empty_cache()
             model.train()
