@@ -40,6 +40,9 @@ def parse_args():
     parser.add_argument("--save_intermediate", action="store_true", help="Save intermediate steps.")
     parser.add_argument("--gpu", type=str, default="cuda:0", help="GPU to use.")
     parser.add_argument("--steps", type=int, default=5, help="Number of steps for the diffusion.")
+    parser.add_argument("--resolutions", nargs="+", type=int, default=[10000, 50000])
+    parser.add_argument("--noises", nargs="+", type=float, default=[0.01, 0.02, 0.03])
+    parser.add_argument("--max_shapes", type=int, default=None, help="Limit shapes per setting for smoke evaluation.")
     parser.add_argument("--distribution_type", default="none")
     args = parser.parse_args()
 
@@ -139,8 +142,8 @@ def patch_based_denoise(
 @torch.no_grad()
 def sample(
     cfg: DictConfig,
-    resolutions: List[int] = [10000, 50000],
-    noises: List[float] = [0.01, 0.02, 0.03],
+    resolutions: List[int] = None,
+    noises: List[float] = None,
     save_title: str = "P2P-Bridge",
 ) -> None:
     """
@@ -166,12 +169,17 @@ def sample(
         save_title += "_ema"
     save_title += f"_steps_{cfg.steps}"
 
+    resolutions = cfg.resolutions if resolutions is None else resolutions
+    noises = cfg.noises if noises is None else noises
+
     for res in resolutions:
         for noise in noises:
             input_dir = os.path.join(cfg.data_path, "%s_%s_poisson_%s" % (cfg.dataset, res, noise))
             output_dir = os.path.join(out_root, f"{save_title}_{res}_{noise}")
 
-            for data in input_iter(input_dir):
+            for idx, data in enumerate(input_iter(input_dir)):
+                if cfg.max_shapes is not None and idx >= cfg.max_shapes:
+                    break
                 logger.info(f"Processing {data['name']}")
                 pcl_noisy = data["pcl_noisy"].to(cfg.gpu)
                 with torch.no_grad():

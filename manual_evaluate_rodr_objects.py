@@ -2,6 +2,7 @@ import argparse
 import re
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -17,6 +18,14 @@ class CheckpointPair:
     baseline: Path
     candidate: Path
     candidate_name: str
+
+
+@dataclass(frozen=True)
+class EvalTask:
+    ckpt: Path
+    output_dir: Path
+    dataset: str
+    label: str
 
 
 def parse_args() -> argparse.Namespace:
@@ -38,9 +47,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gpu", default="cuda:0")
     parser.add_argument("--diffusion_steps", type=int, default=5)
     parser.add_argument("--k", type=int, default=3, help="Patch oversampling factor passed to evaluate_objects.py.")
+    parser.add_argument("--resolutions", nargs="+", type=int, default=[10000])
+    parser.add_argument("--noises", nargs="+", type=float, default=[0.01])
+    parser.add_argument("--max_shapes", type=int, default=3)
+    parser.add_argument(
+        "--full_eval",
+        action="store_true",
+        help="Run the full object benchmark: PUNet+PCNet, 10000/50000 resolutions, 0.01/0.02/0.03 noise, all shapes.",
+    )
     parser.add_argument("--use_ema", action="store_true")
     parser.add_argument("--save_intermediate", action="store_true")
     parser.add_argument("--force", action="store_true", help="Re-run evaluation even if summary CSVs already exist.")
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        help="Number of evaluate_objects.py subprocesses to run in parallel. Try 2 first on one 4090.",
+    )
     return parser.parse_args()
 
 
@@ -125,7 +148,13 @@ def run_evaluate_objects(
         str(args.diffusion_steps),
         "--k",
         str(args.k),
+        "--resolutions",
+        *[str(resolution) for resolution in args.resolutions],
+        "--noises",
+        *[str(noise) for noise in args.noises],
     ]
+    if args.max_shapes is not None:
+        cmd.extend(["--max_shapes", str(args.max_shapes)])
     if args.use_ema:
         cmd.append("--use_ema")
     if args.save_intermediate:
@@ -133,6 +162,11 @@ def run_evaluate_objects(
 
     print("[run] " + " ".join(cmd))
     subprocess.run(cmd, check=True)
+
+
+def run_task(task: EvalTask, args: argparse.Namespace) -> EvalTask:
+    run_evaluate_objects(task.ckpt, task.output_dir, task.dataset, args)
+    return task
 
 
 def read_metric_rows(output_dir: Path, dataset: str, label: str, step: int) -> list[dict[str, object]]:
@@ -198,6 +232,12 @@ def main() -> None:
     args = parse_args()
     import pandas as pd
 
+    if args.full_eval:
+        args.datasets = ["PUNet", "PCNet"]
+        args.resolutions = [10000, 50000]
+        args.noises = [0.01, 0.02, 0.03]
+        args.max_shapes = None
+
     save_root = Path(args.save_root)
     output_root = Path(args.output_root) if args.output_root else save_root / "manual_eval_objects"
     output_root.mkdir(parents=True, exist_ok=True)
@@ -206,13 +246,27 @@ def main() -> None:
     pairs = find_pairs(args)
 
     for pair in pairs:
+        tasks: list[EvalTask] = []
+        for dataset in args.datasets:
+            baseline_out = output_root / f"step_{pair.step}" / args.baseline_name / dataset
+            candidate_out = output_root / f"step_{pair.step}" / pair.candidate_name / dataset
+            tasks.append(EvalTask(pair.baseline, baseline_out, dataset, args.baseline_name))
+            tasks.append(EvalTask(pair.candidate, candidate_out, dataset, pair.candidate_name))
+
+        if args.jobs > 1:
+            with ThreadPoolExecutor(max_workers=args.jobs) as executor:
+                futures = [executor.submit(run_task, task, args) for task in tasks]
+                for future in as_completed(futures):
+                    task = future.result()
+                    print(f"[done-task] {task.label} {task.dataset} -> {task.output_dir}")
+        else:
+            for task in tasks:
+                run_task(task, args)
+
         for dataset in args.datasets:
             pair_rows: list[dict[str, object]] = []
             baseline_out = output_root / f"step_{pair.step}" / args.baseline_name / dataset
             candidate_out = output_root / f"step_{pair.step}" / pair.candidate_name / dataset
-
-            run_evaluate_objects(pair.baseline, baseline_out, dataset, args)
-            run_evaluate_objects(pair.candidate, candidate_out, dataset, args)
 
             pair_rows.extend(read_metric_rows(baseline_out, dataset, args.baseline_name, pair.step))
             pair_rows.extend(read_metric_rows(candidate_out, dataset, pair.candidate_name, pair.step))
