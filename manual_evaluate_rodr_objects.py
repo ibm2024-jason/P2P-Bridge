@@ -115,8 +115,21 @@ def summary_files(output_dir: Path, dataset: str) -> list[Path]:
     return sorted(output_dir.rglob(f"Summary_{dataset}.csv"))
 
 
-def has_completed_eval(output_dir: Path, dataset: str) -> bool:
-    return bool(summary_files(output_dir, dataset))
+def expected_summary_files(output_dir: Path, dataset: str, args: argparse.Namespace) -> list[Path]:
+    files: list[Path] = []
+    for resolution in args.resolutions:
+        for noise in args.noises:
+            setting = f"P2P-Bridge_steps_{args.diffusion_steps}_{resolution}_{noise}"
+            files.append(output_dir / dataset / setting / f"Summary_{dataset}.csv")
+    return files
+
+
+def missing_summary_files(output_dir: Path, dataset: str, args: argparse.Namespace) -> list[Path]:
+    return [path for path in expected_summary_files(output_dir, dataset, args) if not path.exists()]
+
+
+def has_completed_eval(output_dir: Path, dataset: str, args: argparse.Namespace) -> bool:
+    return not missing_summary_files(output_dir, dataset, args)
 
 
 def run_evaluate_objects(
@@ -125,9 +138,12 @@ def run_evaluate_objects(
     dataset: str,
     args: argparse.Namespace,
 ) -> None:
-    if has_completed_eval(output_dir, dataset) and not args.force:
+    missing = missing_summary_files(output_dir, dataset, args)
+    if not missing and not args.force:
         print(f"[skip] {dataset} {ckpt} -> {output_dir}")
         return
+    if missing and not args.force:
+        print(f"[resume] {dataset} {ckpt} missing {len(missing)} summary file(s); rerunning this task.")
 
     cmd = [
         sys.executable,

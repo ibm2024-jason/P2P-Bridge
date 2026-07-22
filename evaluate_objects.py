@@ -176,6 +176,10 @@ def sample(
         for noise in noises:
             input_dir = os.path.join(cfg.data_path, "%s_%s_poisson_%s" % (cfg.dataset, res, noise))
             output_dir = os.path.join(out_root, f"{save_title}_{res}_{noise}")
+            summary_path = os.path.join(output_dir, f"Summary_{cfg.dataset}.csv")
+            if os.path.exists(summary_path):
+                logger.info(f"Skipping completed setting {output_dir}")
+                continue
 
             for idx, data in enumerate(input_iter(input_dir)):
                 if cfg.max_shapes is not None and idx >= cfg.max_shapes:
