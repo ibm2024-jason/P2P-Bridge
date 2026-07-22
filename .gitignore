@@ -41,3 +41,44 @@ evaluation/
 output_objects/
 pretrained/
 data/objects
+
+# Archives and downloaded datasets
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.gz
+*.bz2
+*.xz
+data/*.zip
+data/*.tar*
+data/objects/
+
+# Local starter / generated datasets
+data/dataset_train/
+data/local/clean/
+data/local/noisy/
+data/local/mesh/
+
+# Training outputs
+experiments/
+wandb/
+runs/
+logs/
+logs_*/
+*.pid
+
+# Python / native extension build artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+*.so
+*.o
+*.cu.o

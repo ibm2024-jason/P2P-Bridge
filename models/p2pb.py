@@ -131,6 +131,7 @@ class P2PB(DiffusionModel):
         self.mu_x0 = to_torch(mu_x0).to(device)
         self.mu_x1 = to_torch(mu_x1).to(device)
         self.calculate_loss = get_loss(self.loss_type)
+        self.calculate_eval_loss = get_loss("mse")
 
         alphas_cumprod = np.cumprod(1 - betas)
         snr = alphas_cumprod / (1 - alphas_cumprod)
@@ -367,7 +368,7 @@ class P2PB(DiffusionModel):
     def loss(self, pred: Tensor, gt: Tensor) -> Tensor:
         pred = pred.to(self.device)
         gt = gt.to(self.device)
-        loss = self.calculate_loss(pred, gt)
+        loss = self.calculate_eval_loss(pred, gt)
         # loss = loss * extract(self.loss_weight, torch.zeros(pred.shape[0]), loss.shape)  # SNR weighted loss
         loss = loss.mean()
         return loss
@@ -416,8 +417,8 @@ class P2PB(DiffusionModel):
             loss = self.calculate_loss(pred_x0, x0, x1, tangent_weight=self.rodr_tangent_weight)
         else:
             loss = self.calculate_loss(pred, gt)
-            if self.weight_loss:
-                loss = loss * extract(self.loss_weight, steps, loss.shape)
+        if self.weight_loss:
+            loss = loss * extract(self.loss_weight, steps, loss.shape)
         loss = loss.mean()
         loss = loss * self.loss_multiplier
 

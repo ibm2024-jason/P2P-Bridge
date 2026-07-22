@@ -26,7 +26,13 @@ def l1(pred: Tensor, gt: Tensor) -> Tensor:
     return loss
 
 
-def rodr_x0(pred_x0: Tensor, clean: Tensor, noisy: Tensor, tangent_weight: float = 1.0, eps: float = 1e-8) -> Tensor:
+def rodr_x0(
+    pred_x0: Tensor,
+    clean: Tensor,
+    noisy: Tensor,
+    tangent_weight: float = 1.0,
+    eps: float = 1e-8,
+) -> Tensor:
     """RODR loss on denoising displacement pred_x0 - noisy against clean - noisy."""
     pred_dir = pred_x0 - noisy
     gt_dir = clean - noisy

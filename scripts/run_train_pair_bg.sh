@@ -11,6 +11,7 @@ BS="${BS:-8}"
 WORKERS="${WORKERS:-2}"
 RODR_WEIGHT="${RODR_WEIGHT:-1.0}"
 WANDB_MODE="${WANDB_MODE:-disabled}"
+SAVE_INTERVAL="${SAVE_INTERVAL:-${STEPS}}"
 
 case "${DATASET}" in
   starter|StarterLocal)
@@ -44,6 +45,7 @@ echo "Starting baseline on GPU ${GPU_BASE}. Log: ${BASE_LOG}"
     --name baseline_mse \
     --distribution_type single \
     --training.steps "${STEPS}" \
+    --training.save_interval "${SAVE_INTERVAL}" \
     --training.bs "${BS}" \
     --data.workers "${WORKERS}"
 ) >"${BASE_LOG}" 2>&1 &
@@ -59,6 +61,7 @@ echo "Starting RODR on GPU ${GPU_RODR}. Log: ${RODR_LOG}"
     --name rodr_w${RODR_WEIGHT} \
     --distribution_type single \
     --training.steps "${STEPS}" \
+    --training.save_interval "${SAVE_INTERVAL}" \
     --training.bs "${BS}" \
     --data.workers "${WORKERS}" \
     --diffusion.rodr_tangent_weight "${RODR_WEIGHT}"
