@@ -100,7 +100,8 @@ def summarize_comparisons(comparisons, baseline_name: str):
 
 def metric_label(resolution, noise, metric: str) -> str:
     density = "10k_sparse" if int(resolution) == 10000 else "50k_dense" if int(resolution) == 50000 else str(resolution)
-    noise_pct = f"{int(round(float(noise) * 100))}%"
+    noise_pct_value = float(noise) * 100
+    noise_pct = f"{noise_pct_value:g}%"
     return f"{density}_{noise_pct}_{metric.upper()}"
 
 
