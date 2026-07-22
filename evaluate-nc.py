@@ -62,7 +62,7 @@ def parse_step(path: Path) -> int | None:
 def discover_prediction_settings(args: argparse.Namespace) -> list[PredictionSetting]:
     eval_root = Path(args.eval_root)
     model_names = [args.baseline_name] + sorted(
-        path.name for path in eval_root.glob(args.candidate_glob) if path.is_dir()
+        {path.name for path in eval_root.rglob(args.candidate_glob) if path.is_dir()}
     )
     settings: list[PredictionSetting] = []
 
@@ -254,6 +254,10 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     settings = discover_prediction_settings(args)
+    print(f"[discover] found {len(settings)} prediction setting(s)")
+    for setting in settings:
+        print(f"[discover] {setting.step} {setting.model} {setting.dataset} {setting.setting}")
+
     mesh_cache: dict[str, dict[str, tuple[np.ndarray, np.ndarray]]] = {}
     shape_rows: list[dict[str, object]] = []
 
