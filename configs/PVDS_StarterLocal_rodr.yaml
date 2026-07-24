@@ -15,11 +15,11 @@ data:
 diffusion:
   timesteps: 1000
   sampling_timesteps: 10
-  objective: pred_noise
+  objective: pred_x0
   schedule: linear
   sampling_strategy: DDPM
   loss_type: rodr
-  rodr_tangent_weight: 1.0
+  rodr_tangent_weight: 0.5
   beta_start: 1.e-4
   beta_end: 0.02
   t0: 1.e-4
@@ -77,12 +77,12 @@ model:
 training:
   optimizer:
     type: AdamW
-    lr: 3.e-4
+    lr: 1.e-4
     beta1: 0.9
     beta2: 0.999
     weight_decay: 1.0e-05
   scheduler:
-    type: constant
+    type: StepLR
     lr_gamma: 0.999
   grad_clip:
     enabled: true
